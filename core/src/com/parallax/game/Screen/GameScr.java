@@ -16,6 +16,9 @@ import com.badlogic.gdx.graphics.g3d.ModelInstance;
 import com.badlogic.gdx.graphics.g3d.attributes.ColorAttribute;
 import com.badlogic.gdx.graphics.g3d.environment.DirectionalLight;
 import com.badlogic.gdx.graphics.g3d.utils.CameraInputController;
+import com.badlogic.gdx.math.Matrix4;
+import com.badlogic.gdx.math.Quaternion;
+import com.badlogic.gdx.math.Vector3;
 import com.badlogic.gdx.scenes.scene2d.Stage;
 import com.badlogic.gdx.scenes.scene2d.ui.ImageButton;
 import com.badlogic.gdx.scenes.scene2d.ui.Skin;
@@ -46,8 +49,7 @@ public class GameScr implements Screen {
     private boolean loading;
     private Tank tank;
 
-    private BitmapFont font;
-    private String str;
+    private Tank tankTest;
 
     public GameScr(Main main) {
         this.main = main;
@@ -58,16 +60,12 @@ public class GameScr implements Screen {
         modelBatch = new ModelBatch();
         camController = new CameraInputController(cam);
 
-        font = new BitmapFont();
-        font.setColor(Color.RED);
-
         initControlls();
         initCamEnv();
         initAssets();
 
-        tank = new Tank(0, 0, 0);
-
-//        TODO Связать джостики с моделью
+        tank = new Tank(5, 0, -5);
+        tankTest = new Tank(0, 0, 0);
     }
 
     @Override
@@ -77,40 +75,40 @@ public class GameScr implements Screen {
         Gdx.input.setInputProcessor(stage);
     }
 
+    private void update(float delta){
+        if (loading && assets.update()) doneLoading();
+
+        if (!loading && assets.update() && (joystickBody.isTouched()|| joystickHead.isTouched())){
+            tank.moveBody(joystickBody, joystickHead, delta);
+        }
+    }
+
     @Override
     public void render(float delta) {
 
-        str = Float.toString(tank.position.x) + " | " + Float.toString(tank.position.y);
-
-        if (loading && assets.update()) doneLoading();
-        if (loading) tank.update(joystickBody.getHeight() + joystickBody.getKnobX(), joystickBody.getHeight() + joystickBody.getKnobY(), 0, delta);
+//        -------- Движение модели --------
+        update(delta);
 
 //        -------- Обновление данный актеров и разрешения экрана --------
         stage.act(delta);
         viewport.update(viewport.getScreenWidth(), viewport.getScreenHeight());
 
 
-//        -------- Обновление кадра --------
-        Gdx.gl.glClearColor(1, 1, 1, 1);
-        Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
-        Gdx.gl.glViewport(0,0,Gdx.graphics.getWidth(), Gdx.graphics.getHeight());
-        Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT | GL20.GL_DEPTH_BUFFER_BIT);
-
+        main.cleanScreen();
 
 //        -------- Рисование объектов --------
+        modelBatch.begin(cam);
+        modelBatch.render(instances, environment);
+        modelBatch.end();
+
+//        -------- Рисование UI --------
         batch.begin();
         stage.draw();
         joystickBody.draw(batch, 1);
         joystickHead.draw(batch, 1);
         shotBtn.draw(batch, 1);
-
-
-        font.draw(batch, str, 100, 100);
         batch.end();
 
-        modelBatch.begin(cam);
-        modelBatch.render(instances, environment);
-        modelBatch.end();
     }
 
     @Override
@@ -205,7 +203,7 @@ public class GameScr implements Screen {
 //        --- Камера ---
 
         cam = new PerspectiveCamera(67, Gdx.graphics.getWidth(), Gdx.graphics.getHeight());
-        cam.position.set(5f, 5f, 5f);
+        cam.position.set(0, 15, 10);
         cam.lookAt(0,0,0);
         cam.near = 1f;
         cam.far = 300f;
@@ -218,12 +216,20 @@ public class GameScr implements Screen {
 
         assets = new AssetManager();
         assets.load("Models/Tank.obj", Model.class);
+        assets.load("Models/Head.obj", Model.class);
         loading = true;
     }
 
     private void doneLoading(){
-        tank.loadModel(assets.get("Models/Tank.obj", Model.class));
+        tank.loadModel(assets);
+        tankTest.loadModel(assets);
+
         instances.add(tank.getBody());
+        instances.add(tank.getHead());
+
+        instances.add(tankTest.getBody());
+        instances.add(tankTest.getHead());
+
         loading = false;
     }
 }
