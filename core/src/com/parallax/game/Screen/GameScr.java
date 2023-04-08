@@ -19,6 +19,7 @@ import com.badlogic.gdx.graphics.g3d.utils.CameraInputController;
 import com.badlogic.gdx.math.Matrix4;
 import com.badlogic.gdx.math.Quaternion;
 import com.badlogic.gdx.math.Vector3;
+import com.badlogic.gdx.math.collision.BoundingBox;
 import com.badlogic.gdx.scenes.scene2d.Stage;
 import com.badlogic.gdx.scenes.scene2d.ui.ImageButton;
 import com.badlogic.gdx.scenes.scene2d.ui.Skin;
@@ -50,6 +51,9 @@ public class GameScr implements Screen {
     private Tank tank;
 
     private Tank tankTest;
+    BitmapFont font = new BitmapFont();
+    String str1;
+    String str2;
 
     public GameScr(Main main) {
         this.main = main;
@@ -66,6 +70,7 @@ public class GameScr implements Screen {
 
         tank = new Tank(5, 0, -5);
         tankTest = new Tank(0, 0, 0);
+        font.setColor(Color.BLACK);
     }
 
     @Override
@@ -78,8 +83,13 @@ public class GameScr implements Screen {
     private void update(float delta){
         if (loading && assets.update()) doneLoading();
 
-        if (!loading && assets.update() && (joystickBody.isTouched()|| joystickHead.isTouched())){
-            tank.moveBody(joystickBody, joystickHead, delta);
+        if (!loading && assets.update()){
+
+            if (!tank.isCollision(tankTest)){
+                tank.moveBody(joystickBody, joystickHead, false);
+            } else {
+                tank.moveBody(joystickBody, joystickHead, true);
+            }
         }
     }
 
@@ -88,6 +98,8 @@ public class GameScr implements Screen {
 
 //        -------- Движение модели --------
         update(delta);
+        str1 = "x: " + Float.toString(0) + "  z: " + Float.toString(0);
+        str2 = Float.toString(tank.health) + "   " + Float.toString(0);
 
 //        -------- Обновление данный актеров и разрешения экрана --------
         stage.act(delta);
@@ -107,6 +119,8 @@ public class GameScr implements Screen {
         joystickBody.draw(batch, 1);
         joystickHead.draw(batch, 1);
         shotBtn.draw(batch, 1);
+        font.draw(batch, str1,50, 50);
+        font.draw(batch, str2,50, 25);
         batch.end();
 
     }
@@ -203,7 +217,7 @@ public class GameScr implements Screen {
 //        --- Камера ---
 
         cam = new PerspectiveCamera(67, Gdx.graphics.getWidth(), Gdx.graphics.getHeight());
-        cam.position.set(0, 15, 10);
+        cam.position.set(0, 15, -10);
         cam.lookAt(0,0,0);
         cam.near = 1f;
         cam.far = 300f;

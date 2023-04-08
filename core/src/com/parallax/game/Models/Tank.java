@@ -4,27 +4,43 @@ import com.badlogic.gdx.assets.AssetManager;
 import com.badlogic.gdx.graphics.g3d.Model;
 import com.badlogic.gdx.graphics.g3d.ModelInstance;
 import com.badlogic.gdx.math.Matrix4;
-import com.badlogic.gdx.math.Quaternion;
-import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.math.Vector3;
 import com.badlogic.gdx.math.collision.BoundingBox;
 import com.badlogic.gdx.scenes.scene2d.ui.Touchpad;
 
-//    Todo Реализовать коллизию с помощью BoundingBox
+import java.lang.reflect.Array;
 
 public class Tank {
 
+//    -------------- Переменные для колижн модели ------------
+
+    private final BoundingBox collisionModel;
+    private final Vector3 minBoundary;
+    private final Vector3 maxBoundary;
+    private final float height;
+    private final float width;
+    private final float depth;
+
+
+//    --------------- Переменные состояния танка ---------------
+
+    private final Matrix4 transformMatrix = new Matrix4();
+    private final Vector3 directionBody;
+    private final Vector3 directionHead;
     private final Vector3 position;
     private final float speedHead;
     private final float speedBody;
     private final float speedRotateBody;
-    private final float health;
+    public final float health;
     private final boolean isDestroy;
+
+
+//    ---------------- Переменные модели -------------------------
+
     private ModelInstance body;
     private ModelInstance head;
-    private final Matrix4 transformMatrix = new Matrix4();
-    private final Vector3 directionBody;
-    private final Vector3 directionHead;
+
+
 
     public Tank(float x, float y, float z) {
 
@@ -32,10 +48,20 @@ public class Tank {
         speedBody = 15;
         speedRotateBody = 1000;
         speedHead = 1000;
-        directionBody = new Vector3(0, 0, 0);
-        directionHead = new Vector3(0, 0, 0);
-        health = 100;
         isDestroy = false;
+        health = 100;
+
+
+        directionBody = new Vector3(speedBody, 0, speedBody);
+        directionHead = new Vector3(speedHead, 0, speedHead);
+
+
+        height = 1.47f;
+        width = 1.48f / 1.4f;
+        depth = 0.98f * 1.5f;
+        minBoundary = new Vector3(position.x - width, 0, position.z - depth);
+        maxBoundary = new Vector3(position.x + width, height, position.z + depth);
+        collisionModel = new BoundingBox(minBoundary, maxBoundary);
     }
 
     public void loadModel(AssetManager asset){
@@ -44,30 +70,53 @@ public class Tank {
 
         body.transform.setToTranslation(position);
         head.transform.setToTranslation(position);
-        body.transform.setToRotation(Vector3.Y, 180);
-        head.transform.setToRotation(Vector3.Y, 180);
     }
 
-    // TODO Доделать систему поворота на месте
-    public void moveBody(Touchpad joystickB, Touchpad joystickH, float delta){
+    public void moveBody(Touchpad joystickB, Touchpad joystickH, boolean collision){
 
-        float joyBX = joystickB.getKnobPercentX();
+        float joyBX = -joystickB.getKnobPercentX();
         float joyBY = joystickB.getKnobPercentY();
-        float joyHX = joystickH.getKnobPercentX();
+        float joyHX = -joystickH.getKnobPercentX();
         float joyHY = joystickH.getKnobPercentY();
 
+        transformMatrix.toNormalMatrix();
 
-        position.add(joyBX / speedBody, 0 , -joyBY /speedBody);
-        directionBody.set(-joyBX * speedRotateBody, 0, joyBY * speedRotateBody);
-        directionHead.set(-joyHX * speedHead, 0, joyHY * speedHead);
+
+        if (collision){
+            position.add(-joyBX * 2, 0 , -joyBY * 2);
+        } else {
+            position.add(joyBX / speedBody, 0 , joyBY /speedBody);
+        }
+
+        minBoundary.set(position.x - width, 0, position.z - depth);
+        maxBoundary.set(position.x + width, height, position.z + depth);
+
+        if (joystickB.isTouched()){
+            directionBody.set(-joyBX, 0, -joyBY);
+            directionBody.scl(speedRotateBody);
+        }
+
+        if (joystickH.isTouched()){
+            directionHead.set(-joyHX, 0, -joyHY);
+            directionHead.scl(speedHead);
+        }
+        collisionModel.set(minBoundary, maxBoundary);
 
         transformMatrix.translate(position);
         body.transform.set(transformMatrix);
         head.transform.set(transformMatrix);
-        position.set(0, 0, 0);
+
 
         body.transform.rotateTowardTarget(directionBody, Vector3.Y);
-        if (joystickH.isTouched()) head.transform.rotateTowardTarget(directionHead, Vector3.Y);
+        head.transform.rotateTowardTarget(directionHead, Vector3.Y);
+    }
+
+    public boolean isCollision(Tank tank){
+        return this.collisionModel.intersects(tank.getCollisionModel());
+    }
+
+    public BoundingBox getCollisionModel(){
+        return collisionModel;
     }
 
     public ModelInstance getBody(){
