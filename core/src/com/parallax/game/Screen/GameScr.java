@@ -27,7 +27,9 @@ import com.badlogic.gdx.scenes.scene2d.ui.Touchpad;
 import com.badlogic.gdx.utils.Array;
 import com.badlogic.gdx.utils.viewport.FitViewport;
 import com.badlogic.gdx.utils.viewport.Viewport;
+import com.parallax.game.GameCollisionManager;
 import com.parallax.game.Main;
+import com.parallax.game.Models.Bullet;
 import com.parallax.game.Models.Tank;
 import com.sun.tools.javac.comp.Todo;
 
@@ -47,10 +49,13 @@ public class GameScr implements Screen {
     private CameraInputController camController;
     private AssetManager assets;
     private Array<ModelInstance> instances = new Array<ModelInstance>();
+    private Array<Bullet> bullets = new Array<Bullet>();
+    private Array<Tank> tanks = new Array<Tank>();
     private boolean loading;
     private Tank tank;
 
     private Tank tankTest;
+    public GameCollisionManager gcm;
     BitmapFont font = new BitmapFont();
     String str1;
     String str2;
@@ -68,9 +73,16 @@ public class GameScr implements Screen {
         initCamEnv();
         initAssets();
 
-        tank = new Tank(5, 0, -5);
-        tankTest = new Tank(0, 0, 0);
+        tanks.add(new Tank(5, 0, -5));
+        tanks.add(new Tank(10, 0, 10));
+        tank = tanks.first();
+        tankTest = tanks.peek();
+
+        for (int i = 0; i < tanks.size; i++) bullets.add(new Bullet());
+
+        gcm = new GameCollisionManager(bullets, tanks);
         font.setColor(Color.BLACK);
+
     }
 
     @Override
@@ -85,11 +97,23 @@ public class GameScr implements Screen {
 
         if (!loading && assets.update()){
 
-            if (!tank.isCollision(tankTest)){
-                tank.moveBody(joystickBody, joystickHead, false);
-            } else {
-                tank.moveBody(joystickBody, joystickHead, true);
+            tank.moveBody(joystickBody, joystickHead);
+
+            if (shotBtn.isPressed() && !tank.isReloading){
+                for (int i = 0; i < bullets.size; i++){
+                    Bullet bullet = bullets.get(i);
+
+                    if (!bullet.isActive()){
+                        bullet.activate();
+                        tank.shot(bullet);
+                    }
+                }
             }
+
+            if (tank.isReloading) tank.reload(delta);
+
+            gcm.update();
+            for (int i = 0; i < bullets.size; i++) bullets.get(i).update();
         }
     }
 
@@ -98,8 +122,8 @@ public class GameScr implements Screen {
 
 //        -------- Движение модели --------
         update(delta);
-        str1 = "x: " + Float.toString(0) + "  z: " + Float.toString(0);
-        str2 = Float.toString(tank.health) + "   " + Float.toString(0);
+        str1 = "x: " + Boolean.toString(tank.isDestroy);
+        str2 = Float.toString(tank.timeReloading) + "   " + Float.toString(gcm.bullets.size);
 
 //        -------- Обновление данный актеров и разрешения экрана --------
         stage.act(delta);
@@ -231,19 +255,22 @@ public class GameScr implements Screen {
         assets = new AssetManager();
         assets.load("Models/Tank.obj", Model.class);
         assets.load("Models/Head.obj", Model.class);
+        assets.load("Models/Bullet.obj", Model.class);
         loading = true;
     }
 
     private void doneLoading(){
-        tank.loadModel(assets);
-        tankTest.loadModel(assets);
 
-        instances.add(tank.getBody());
-        instances.add(tank.getHead());
+        for (int i = 0; i < tanks.size; i++){
+            Tank tank = tanks.get(i);
+            Bullet bullet = bullets.get(i);
 
-        instances.add(tankTest.getBody());
-        instances.add(tankTest.getHead());
-
+            tank.loadModel(assets);
+            bullet.loadModel(assets);
+            instances.add(bullet.getBody());
+            instances.add(tank.getBody());
+            instances.add(tank.getHead());
+        }
         loading = false;
     }
 }
