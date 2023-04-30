@@ -12,7 +12,7 @@ public class Tank {
 
 //    -------------- Переменные для колижн модели ------------
 
-    public final BoundingBox collisionModel;
+    private final BoundingBox collisionModel;
     private final Vector3 minBoundary;
     private final Vector3 maxBoundary;
     private final float height;
@@ -23,16 +23,18 @@ public class Tank {
 //    --------------- Переменные состояния танка ---------------
 
     private final Matrix4 transformMatrix = new Matrix4();
-    public final Vector3 directionBody;
+    public Matrix4 translation = new Matrix4();
+    public Matrix4 rotation = new Matrix4();
+    private final Vector3 directionBody;
     private final Vector3 directionHead;
-    public  Vector3 position;
+    private   Vector3 position;
     private final float speedHead;
     private final float speedBody;
     private final float speedRotateBody;
     public float health;
     public boolean isDestroy;
-    public boolean isReloading;
-    public float timeReloading;
+    private boolean isReloading;
+    private float timeReloading;
 
 
 //    ---------------- Переменные модели -------------------------
@@ -77,9 +79,17 @@ public class Tank {
         }
     }
 
+    public void getDamage(){
+        health -= 10;
+    }
+
+    public void setLoading(AssetManager gam){
+        gam.load("Models/Body.g3dj", Model.class);
+        gam.load("Models/Head.g3dj", Model.class);
+    }
     public void loadModel(AssetManager asset){
-        body = new ModelInstance(asset.get("Models/Tank.obj", Model.class));
-        head = new ModelInstance(asset.get("Models/Head.obj", Model.class));
+        body = new ModelInstance(asset.get("Models/Body.g3dj", Model.class));
+        head = new ModelInstance(asset.get("Models/Head.g3dj", Model.class));
 
         body.transform.setToTranslation(position);
         head.transform.setToTranslation(position);
@@ -93,6 +103,7 @@ public class Tank {
         float joyHY = joystickH.getKnobPercentY();
 
         transformMatrix.toNormalMatrix();
+
 
         position.add(joyBX / speedBody, 0 , joyBY /speedBody);
 
@@ -116,7 +127,6 @@ public class Tank {
         body.transform.set(transformMatrix);
         head.transform.set(transformMatrix);
 
-
         body.transform.rotateTowardTarget(directionBody, Vector3.Y);
         head.transform.rotateTowardTarget(directionHead, Vector3.Y);
     }
@@ -128,6 +138,10 @@ public class Tank {
 
     public boolean isCollision(Bullet bullet){
         return this.collisionModel.intersects(bullet.getCollisionModel());
+    }
+
+    public boolean isCollision(Obstacle obstacle){
+        return this.collisionModel.intersects(obstacle.getCollisionModel());
     }
 
     public void repel(){

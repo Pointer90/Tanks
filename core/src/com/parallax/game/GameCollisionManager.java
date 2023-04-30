@@ -2,16 +2,19 @@ package com.parallax.game;
 
 import com.badlogic.gdx.utils.Array;
 import com.parallax.game.Models.Bullet;
+import com.parallax.game.Models.Obstacle;
 import com.parallax.game.Models.Tank;
 
 public class GameCollisionManager {
 
     public Array<Bullet> bullets;
     public Array<Tank> tanks;
+    public Array<Obstacle> obstacles;
 
-    public GameCollisionManager(Array<Bullet> arrayBullets, Array<Tank> arrayTanks){
+    public GameCollisionManager(Array<Bullet> arrayBullets, Array<Tank> arrayTanks, Array<Obstacle> arrayObstacles){
         bullets = arrayBullets;
         tanks = arrayTanks;
+        obstacles = arrayObstacles;
     }
 
     public void update(){
@@ -26,17 +29,35 @@ public class GameCollisionManager {
                     tank.repel();
                 }
             }
-        }
 
+            for (int k = 0; k < obstacles.size; k++){
+                Obstacle obstacle = obstacles.get(k);
 
-        for (int i = 0; i < tanks.size; i++){
-            Tank tank = tanks.get(i);
-            for (int j = 0; j < bullets.size; j++){
-                if (tank.isCollision(bullets.get(j))){
-                    bullets.get(j).hit();
-                } else tank.isDestroy = false;
+                if (currentTank.isCollision(obstacle)){
+                    currentTank.repel();
+                }
             }
         }
+
+
+        for (int i = 0; i < bullets.size; i++){
+            Bullet bullet = bullets.get(i);
+
+            for (int j = 0; j < tanks.size; j++){
+                Tank tank = tanks.get(j);
+
+                if (tank.isCollision(bullet)){
+                    bullet.hit();
+                    tank.getDamage();
+                } else tank.isDestroy = false;
+            }
+
+            for (int k = 0; k < obstacles.size; k++){
+                Obstacle obstacle = obstacles.get(k);
+                if (obstacle.isCollision(bullet)) bullet.hit();
+            }
+        }
+
     }
 
 }

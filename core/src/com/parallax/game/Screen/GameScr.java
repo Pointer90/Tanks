@@ -4,7 +4,6 @@ import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Screen;
 import com.badlogic.gdx.assets.AssetManager;
 import com.badlogic.gdx.graphics.Color;
-import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.PerspectiveCamera;
 import com.badlogic.gdx.graphics.g2d.Batch;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
@@ -16,10 +15,6 @@ import com.badlogic.gdx.graphics.g3d.ModelInstance;
 import com.badlogic.gdx.graphics.g3d.attributes.ColorAttribute;
 import com.badlogic.gdx.graphics.g3d.environment.DirectionalLight;
 import com.badlogic.gdx.graphics.g3d.utils.CameraInputController;
-import com.badlogic.gdx.math.Matrix4;
-import com.badlogic.gdx.math.Quaternion;
-import com.badlogic.gdx.math.Vector3;
-import com.badlogic.gdx.math.collision.BoundingBox;
 import com.badlogic.gdx.scenes.scene2d.Stage;
 import com.badlogic.gdx.scenes.scene2d.ui.ImageButton;
 import com.badlogic.gdx.scenes.scene2d.ui.Skin;
@@ -29,9 +24,10 @@ import com.badlogic.gdx.utils.viewport.FitViewport;
 import com.badlogic.gdx.utils.viewport.Viewport;
 import com.parallax.game.GameCollisionManager;
 import com.parallax.game.Main;
+import com.parallax.game.Maps.Map;
 import com.parallax.game.Models.Bullet;
+import com.parallax.game.Models.Obstacle;
 import com.parallax.game.Models.Tank;
-import com.sun.tools.javac.comp.Todo;
 
 public class GameScr implements Screen {
 
@@ -51,11 +47,13 @@ public class GameScr implements Screen {
     private Array<ModelInstance> instances = new Array<ModelInstance>();
     private Array<Bullet> bullets = new Array<Bullet>();
     private Array<Tank> tanks = new Array<Tank>();
+    public  Array<Obstacle> obj = new Array<Obstacle>();
     private boolean loading;
     private Tank tank;
+    private GameCollisionManager gcm;
 
     private Tank tankTest;
-    public GameCollisionManager gcm;
+    public Map map;
     BitmapFont font = new BitmapFont();
     String str1;
     String str2;
@@ -68,10 +66,7 @@ public class GameScr implements Screen {
         stage = new Stage(viewport);
         modelBatch = new ModelBatch();
         camController = new CameraInputController(cam);
-
-        initControlls();
-        initCamEnv();
-        initAssets();
+        map = new Map();
 
         tanks.add(new Tank(5, 0, -5));
         tanks.add(new Tank(10, 0, 10));
@@ -79,8 +74,12 @@ public class GameScr implements Screen {
         tankTest = tanks.peek();
 
         for (int i = 0; i < tanks.size; i++) bullets.add(new Bullet());
+        gcm = new GameCollisionManager(bullets, tanks, map.getObstacles());
 
-        gcm = new GameCollisionManager(bullets, tanks);
+        initControlls();
+        initCamEnv();
+        initAssets();
+
         font.setColor(Color.BLACK);
 
     }
@@ -93,13 +92,12 @@ public class GameScr implements Screen {
     }
 
     private void update(float delta){
-        if (loading && assets.update()) doneLoading();
-
-        if (!loading && assets.update()){
+        if(loading) doneLoading();
+        if (!loading){
 
             tank.moveBody(joystickBody, joystickHead);
 
-            if (shotBtn.isPressed() && !tank.isReloading){
+            if (shotBtn.isPressed() && !tank.isReloading()){
                 for (int i = 0; i < bullets.size; i++){
                     Bullet bullet = bullets.get(i);
 
@@ -110,7 +108,7 @@ public class GameScr implements Screen {
                 }
             }
 
-            if (tank.isReloading) tank.reload(delta);
+            if (tank.isReloading()) tank.reload(delta);
 
             gcm.update();
             for (int i = 0; i < bullets.size; i++) bullets.get(i).update();
@@ -122,8 +120,8 @@ public class GameScr implements Screen {
 
 //        -------- Движение модели --------
         update(delta);
-        str1 = "x: " + Boolean.toString(tank.isDestroy);
-        str2 = Float.toString(tank.timeReloading) + "   " + Float.toString(gcm.bullets.size);
+        str1 = "x: " + Boolean.toString(map.isLoading());
+        str2 = Float.toString(instances.size) + "   " + Float.toString(map.getRenderInstances().size) + assets.getAssetNames();
 
 //        -------- Обновление данный актеров и разрешения экрана --------
         stage.act(delta);
@@ -135,6 +133,7 @@ public class GameScr implements Screen {
 //        -------- Рисование объектов --------
         modelBatch.begin(cam);
         modelBatch.render(instances, environment);
+        modelBatch.render(map.getRenderInstances(), environment);
         modelBatch.end();
 
 //        -------- Рисование UI --------
@@ -209,17 +208,20 @@ public class GameScr implements Screen {
         joystickBody = new Touchpad(25, skin);
         joystickBody.setSize(sizeJoystick, sizeJoystick);
         joystickBody.setPosition(joyBodyX, joyBodeY);
+        joystickBody.setColor(1, 1, 1, 0.5f);
 
 
         joystickHead = new Touchpad(25, skin);
         joystickHead.setSize(sizeJoystick, sizeJoystick);
         joystickHead.setPosition(joyHeadX, joyHeadY);
+        joystickHead.setColor(1, 1, 1, 0.5f);
 
 
 //        ------------ Инициализация кнопок ------------
         shotBtn = new ImageButton(skin);
         shotBtn.setSize( sizeBtn, sizeBtn);
         shotBtn.setPosition(shotBtnX, shotBtnY);
+        shotBtn.setColor(1, 1, 1, 0.5f);
 
 
 //        ------- Добавление акторов -------
@@ -235,13 +237,13 @@ public class GameScr implements Screen {
 //        --- Освещение ---
 
         environment = new Environment();
-        environment.set(new ColorAttribute(ColorAttribute.AmbientLight, 0.4f, 0.4f, 0.4f, 1f));
-        environment.add(new DirectionalLight().set(0.8f, 0.8f, 0.8f, -0.8f,-1f, -0.2f));
+        environment.set(new ColorAttribute(ColorAttribute.AmbientLight, 0.2f, 0.2f, 0.2f, 1f));
+        environment.add(new DirectionalLight().set(1f, 1f, 1f, -0.8f,-1f, -0.2f));
 
 //        --- Камера ---
 
         cam = new PerspectiveCamera(67, Gdx.graphics.getWidth(), Gdx.graphics.getHeight());
-        cam.position.set(0, 15, -10);
+        cam.position.set(0, 25, -15);
         cam.lookAt(0,0,0);
         cam.near = 1f;
         cam.far = 300f;
@@ -253,24 +255,28 @@ public class GameScr implements Screen {
 //        --------- Инициализация загрузчиков моделей ---------
 
         assets = new AssetManager();
-        assets.load("Models/Tank.obj", Model.class);
-        assets.load("Models/Head.obj", Model.class);
-        assets.load("Models/Bullet.obj", Model.class);
+        tank.setLoading(assets);
+        assets.load("Models/Bullet.g3dj", Model.class);
+        map.setLoading(assets);
         loading = true;
     }
 
     private void doneLoading(){
+        if (assets.update()){
+            for (int i = 0; i < tanks.size; i++){
+                Tank tank = tanks.get(i);
+                Bullet bullet = bullets.get(i);
 
-        for (int i = 0; i < tanks.size; i++){
-            Tank tank = tanks.get(i);
-            Bullet bullet = bullets.get(i);
+                tank.loadModel(assets);
+                bullet.loadModel(assets);
+                instances.add(bullet.getBody());
+                instances.add(tank.getBody());
+                instances.add(tank.getHead());
+            }
 
-            tank.loadModel(assets);
-            bullet.loadModel(assets);
-            instances.add(bullet.getBody());
-            instances.add(tank.getBody());
-            instances.add(tank.getHead());
+            loading = false;
         }
-        loading = false;
+
+        if (map.isLoading()) map.load(assets);
     }
 }
